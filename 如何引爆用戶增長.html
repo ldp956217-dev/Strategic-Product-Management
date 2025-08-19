@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>如何引爆用戶增長</title>
+<style>
+  :root{
+    --bg:#0b0f14;--panel:#0f1520;--muted:#94a3b8;--text:#e6edf3;--border:#1f2a3a;--line:#2a3a52;
+    --stage:#FFE7C2;--stage-stroke:#C46A00;      /* 橘：Stage */
+    --tactic:#DCEBFF;--tactic-stroke:#1E63C7;    /* 藍：Strategy */
+    --metric:#DFF5E4;--metric-stroke:#247A3A;    /* 綠：Metric */
+    --tip-bg:#ffffff;--tip-text:#0f172a;--tip-border:#e2e8f0;
+    --focus-ring:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Noto Sans TC,Helvetica,Arial}
+  .app{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;min-height:100vh;padding:12px}
+  header{grid-column:1/3;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .title{font-weight:700}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .toggle,.btn{display:flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:var(--muted);cursor:pointer;outline:none; transition: background .2s, color .2s;}
+  .toggle:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
+  .container{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+
+  /* Focus */
+  .toggle:focus-visible,.btn:focus-visible,.node:focus-visible rect{outline:2px solid var(--focus-ring);outline-offset:2px}
+  .node:focus-visible rect{stroke:var(--focus-ring)!important;stroke-width:3px!important}
+
+  /* 左側 SVG 與圖例 */
+  #graphWrap{display:flex;flex-direction:column}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--border);color:var(--muted)}
+  .badge{display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#0b1420}
+  .dot{width:10px;height:10px;border-radius:50%}
+  svg{width:100%;height:760px;display:block;cursor:default}
+  .lane-title{fill:var(--muted);font-size:12px}
+  .group-title{fill:var(--muted);font-size:12px;text-anchor:middle; transition: opacity 0.3s ease;}
+  .lane-rect{fill:transparent;stroke:var(--line)}
+  .node{cursor:pointer; transition: opacity 0.3s ease;}
+  .node.filtered-out { opacity: 0.15; pointer-events: none; }
+  .node rect{rx:10;ry:10}
+  .node text{fill:#1f2937;font-size:12px;pointer-events:none}
+  .node .sub{fill:#334155;font-size:11px}
+  .stage rect{fill:var(--stage);stroke:var(--stage-stroke);stroke-width:2}
+  .tactic rect{fill:var(--tactic);stroke:var(--tactic-stroke)}
+  .metric rect{fill:var(--metric);stroke:var(--metric-stroke)}
+  .metric text{fill:#065f46}
+  .link { transition: opacity 0.3s ease; }
+  .link path{stroke:#8da2b5;stroke-width:1.4;fill:none;marker-end:url(#arrow)}
+  .link.filtered-out { opacity: 0.1; }
+  .link.dashed path{stroke-dasharray:5 4}
+  .link.soft path{opacity:.7}
+  .emph rect{stroke:#f59e0b!important;stroke-width:3px}
+  .emph-link path{stroke:#f59e0b!important;stroke-width:2.2px}
+  .tooltip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--tip-text);border:1px solid var(--tip-border);padding:8px 10px;border-radius:10px;font-size:12px;opacity:0;box-shadow:0 10px 24px rgba(0,0,0,.2);z-index:100;transition:opacity .2s}
+
+  /* --- 右側說明 (UPDATED) --- */
+  .panel{display:flex;flex-direction:column}
+  .pane{padding:12px}
+  .info-block{
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin:10px 0;
+    background:#0c1522;
+    display:none; /* JS 控制顯示 */
+  }
+  .info-block h4{
+    padding:10px 12px;
+    font-weight:600;
+    color:var(--text);
+    margin:0;
+    border-bottom: 1px solid var(--border);
+  }
+  .info-block .body{
+    padding:12px;
+  }
+  .muted{color:var(--muted)}
+
+  /* 響應式 */
+  @media (max-width: 1024px){
+    .app{grid-template-columns:1fr}
+    header{grid-column:1/1}
+    svg{height:auto;aspect-ratio:1220/760}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title">增長模型互動圖譜</div>
+    <div class="toolbar" role="toolbar" aria-label="視圖與圖層切換">
+      <label class="toggle"><input type="radio" name="view" value="overview" checked> 總覽</label>
+      <label class="toggle"><input type="radio" name="view" value="fly7"> 飛輪效應</label>
+      <label class="toggle"><input type="radio" name="view" value="cold"> 產品冷啟動</label>
+      <span style="width:8px; border-left: 1px solid var(--border); margin: 0 4px;"></span>
+      <label class="toggle"><input type="checkbox" id="tglDrivers" checked> 七大驅動</label>
+      <label class="toggle"><input type="checkbox" id="tglAARRR" checked> AARRR</label>
+      <label class="toggle"><input type="checkbox" id="tglMetrics" checked> 核心指標</label>
+      <label class="toggle"><input type="checkbox" id="tglLoop" checked> 資源閉環</label>
+      <label class="toggle"><input type="checkbox" id="tglStrategy" checked> 策略</label>
+      <button id="btnReset" class="btn" aria-pressed="false">♻️ 重置</button>
+    </div>
+  </header>
+
+  <section class="container" id="graphWrap">
+    <svg id="svg" viewBox="0 0 1220 760" xmlns="http://www.w3.org/2000/svg" aria-label="增長模型視覺圖">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M0 0 L10 5 L0 10 Z" fill="#8da2b5"></path>
+        </marker>
+      </defs>
+      <g id="lanes"></g>
+      <g id="links"></g>
+      <g id="nodes"></g>
+      <g id="group-titles"></g>
+    </svg>
+    <div class="legend">
+      <span class="badge"><span class="dot" style="background:var(--stage)"></span>階段 Stage</span>
+      <span class="badge"><span class="dot" style="background:var(--tactic)"></span>原則與行動策略</span>
+      <span class="badge"><span class="dot" style="background:var(--metric)"></span>指標 Metric</span>
+      <span class="badge">提示：移上看提示、點擊看詳解</span>
+    </div>
+  </section>
+
+  <aside class="container panel">
+    <div class="pane">
+      <h3 id="ov-title" style="margin:6px 0 0 0">增長模型互動圖譜</h3>
+      <div class="info-block" id="block-sum">
+        <h4>Summary</h4>
+        <div id="ov-summary" class="body muted">點擊左側任一圖塊，或使用上方工具列切換視圖與篩選，來探索增長模型。</div>
+      </div>
+      <div class="info-block" id="block-kpi">
+        <h4>KPI / 模型</h4>
+        <div id="ov-kpi" class="body"></div>
+      </div>
+      <div class="info-block" id="block-rel">
+        <h4>關聯與串聯</h4>
+        <div id="ov-rel" class="body"></div>
+      </div>
+      <div class="info-block" id="block-pb">
+        <h4>可執行作法</h4>
+        <div id="ov-pb" class="body"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="tip" class="tooltip" role="tooltip" aria-live="polite"></div>
+
+<script>
+(function(){
+  const svg = document.getElementById('svg');
+  const gLanes = svg.querySelector('#lanes');
+  const gLinks = svg.querySelector('#links');
+  const gNodes = svg.querySelector('#nodes');
+  const gGroupTitles = svg.querySelector('#group-titles');
+  const tip = document.getElementById('tip');
+  const $ = (s,el=document)=>el.querySelector(s);
+  const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
+
+  /* ===================== 資料定義 Start ===================== */
+  const OVERVIEW = {
+    lanes:[
+      { id:'L0', title:'七大增長驅動', x:40,  w:1140, y:40,  h:90  },
+      { id:'L1', title:'AARRR 模型', x:40,  w:1140, y:155, h:95 },
+      { id:'L2', title:'核心指標區', x:40,  w:1140, y:275, h:110 },
+      { id:'L3', title:'資源閉環', x:40, w:1140, y:410, h:100 },
+      { id:'L4', title:'可執行策略 (Playbooks)', x:40,  w:1140, y:540, h:180 }
+    ],
+    groupTitles:[
+      { text:'獲客策略', x:250, y:565 },
+      { text:'留存策略', x:530, y:565 },
+      { text:'變現策略', x:810, y:565 },
+      { text:'再投資策略', x:1055,y:565 },
+    ],
+    nodes:[
+      {id:'DRV_SUP', lane:'L0', x:120, y:85, type:'tactic', title:'供給驅動', sub:'補足/擴供給', w:140},
+      {id:'DRV_USR', lane:'L0', x:280, y:85, type:'tactic', title:'用戶驅動', sub:'拉新留存傳播', w:140},
+      {id:'DRV_PRD', lane:'L0', x:440, y:85, type:'tactic', title:'產品驅動', sub:'降門檻提轉化', w:140},
+      {id:'DRV_CHN', lane:'L0', x:600, y:85, type:'tactic', title:'渠道驅動', sub:'高效低成本', w:140},
+      {id:'DRV_EVT', lane:'L0', x:760, y:85, type:'tactic', title:'活動驅動', sub:'節點引爆', w:140},
+      {id:'DRV_DAT', lane:'L0', x:920, y:85, type:'tactic', title:'數據驅動', sub:'發現瓶頸迭代', w:140},
+      {id:'DRV_BRD', lane:'L0', x:1080,y:85, type:'tactic', title:'品牌驅動', sub:'信任心智', w:140},
+      {id:'AQ',  lane:'L1', x:150,  y:200, type:'tactic', title:'Acquisition', sub:'觸達/安裝'},
+      {id:'ACT', lane:'L1', x:380,  y:200, type:'tactic', title:'Activation',  sub:'首次成功體驗'},
+      {id:'RTN', lane:'L1', x:610,  y:200, type:'tactic', title:'Retention',   sub:'持續使用/回訪'},
+      {id:'REV', lane:'L1', x:840,  y:200, type:'tactic', title:'Revenue',     sub:'付費/交易'},
+      {id:'REF', lane:'L1', x:1070, y:200, type:'tactic', title:'Referral',    sub:'推薦/口碑'},
+      {id:'NSM', lane:'L2', x:190,  y:325, type:'metric', title:'北極星指標', sub:'North Star Metric', w:220},
+      {id:'CAC', lane:'L2', x:420,  y:325, type:'metric', title:'CAC & Payback', sub:'獲客成本與回本週期', w:200},
+      {id:'RFM', lane:'L2', x:630,  y:325, type:'metric', title:'RFM',  sub:'用戶分層模型', w:160},
+      {id:'ARPU',lane:'L2', x:840,  y:325, type:'metric', title:'ARPU', sub:'單用戶平均收入', w:180},
+      {id:'LTV', lane:'L2', x:1050, y:325, type:'metric', title:'LTV',  sub:'用戶終身價值', w:160},
+      {id:'A', lane:'L3', x:250,  y:460, type:'stage',  title:'獲客', sub:'Acquire'},
+      {id:'B', lane:'L3', x:530,  y:460, type:'stage',  title:'留存', sub:'Retain'},
+      {id:'C', lane:'L3', x:810,  y:460, type:'stage',  title:'變現', sub:'Monetize'},
+      {id:'D', lane:'L3', x:1055, y:460, type:'stage',  title:'再投資', sub:'Re-invest'},
+      {id:'A1', lane:'L4', x:160, y:600, type:'tactic', title:'廣告投放', w:160},
+      {id:'A2', lane:'L4', x:340, y:600, type:'tactic', title:'補貼激勵', w:160},
+      {id:'A3', lane:'L4', x:160, y:660, type:'tactic', title:'異業合作', w:160},
+      {id:'BX1',lane:'L4', x:340, y:660, type:'tactic', title:'展會/BD拓客', w:160},
+      {id:'B1', lane:'L4', x:530, y:600, type:'tactic', title:'新手引導', w:160},
+      {id:'B2', lane:'L4', x:530, y:660, type:'tactic', title:'場景綁定', w:160},
+      {id:'C1', lane:'L4', x:720, y:600, type:'tactic', title:'提高客單價(M)', w:160},
+      {id:'C2', lane:'L4', x:890, y:600, type:'tactic', title:'提高頻次(F)', w:160},
+      {id:'C3', lane:'L4', x:810, y:660, type:'tactic', title:'交叉銷售/金融', w:180},
+      {id:'D1', lane:'L4', x:1055,y:600, type:'tactic', title:'LTV/CAC分析', w:160},
+      {id:'D2', lane:'L4', x:1055,y:660, type:'tactic', title:'優化ROI渠道', w:160},
+    ],
+    links:[
+      ['DRV_USR','A'], ['DRV_PRD','B'], ['DRV_CHN','A'], ['DRV_DAT','D'], ['DRV_BRD','C'],
+      ['AQ','A'],['ACT','B'],['RTN','B'],['REV','C'],['REF','A'],
+      ['A','NSM'],['B','NSM'],['C','NSM'], ['A','CAC'], ['B','RFM'],['C','ARPU'],['D','LTV'],
+      ['A1','AQ'], ['A2','ACT'], ['A3','AQ'], ['BX1','AQ'],
+      ['B1','ACT'], ['B2','RTN'],
+      ['C1','REV'], ['C2','REV'], ['C3','REV'],
+      ['D1','D'], ['D2','A'],
+      ['A','B','main'],['B','C','main'],['C','D','main'],['D','A','main'],
+    ]
+  };
+  const FLY7 = {
+    lanes:[], nodes:(()=>{ const cx=620, cy=380, r=260; const s=[ {id:'S1',title:'01 低價/高價值\n吸引用戶'}, {id:'S2',title:'02 拉進更多\n高潛力用戶'}, {id:'S3',title:'03 擴大產品/\n場景覆蓋'}, {id:'S4',title:'04 提升體驗\n與回饋'}, {id:'S5',title:'05 活躍用戶\n回流與推薦'}, {id:'S6',title:'06 規模擴大\n數據↑ 精準↑'}, {id:'S7',title:'07 CAC↓ ARPU↑\n回到 S1'} ]; return s.map((t,i)=>{const a=(Math.PI*2/s.length)*i-Math.PI/2; const x=cx+r*Math.cos(a), y=cy+r*Math.sin(a); return {id:t.id,x,y,type:'stage',title:t.title,w:160,h:56};}); })(),
+    links:[['S1','S2'],['S2','S3'],['S3','S4'],['S4','S5'],['S5','S6'],['S6','S7'],['S7','S1']]
+  };
+  const COLD = {
+    lanes:[],
+    nodes:[
+      {id:'CS_HUB', x:610, y:200, type:'stage', title:'產品冷啟動', sub:'從0到1的六種策略', w:220, h:70},
+      {id:'CS1', x:300, y:400, type:'tactic', title:'名人效應', sub:'KOL背書引流', w:220},
+      {id:'CS2', x:610, y:400, type:'tactic', title:'爆款產品', sub:'以點帶面', w:220},
+      {id:'CS3', x:920, y:400, type:'tactic', title:'馬甲效應', sub:'多品牌擴聲量', w:220},
+      {id:'CS4', x:300, y:550, type:'tactic', title:'種子特權', sub:'共創與內測', w:220},
+      {id:'CS5', x:610, y:550, type:'tactic', title:'定向邀請', sub:'精準關係鏈裂變', w:220},
+      {id:'CS6', x:920, y:550, type:'tactic', title:'媒體報導', sub:'製造話題曝光', w:220},
+    ],
+    links:[
+      ['CS_HUB','CS1'], ['CS_HUB','CS2'], ['CS_HUB','CS3'],
+      ['CS_HUB','CS4'], ['CS_HUB','CS5'], ['CS_HUB','CS6']
+    ]
+  };
+
+  const DB = { /* ... 完整 DB 資料 ... */ };
+  (DB.DRV_SUP = {s:'供給驅動', sum:'創造或擴大有效供給，以匹配並刺激需求。是雙邊平台的基礎。', kpi:'<ul><li>供給側覆蓋率（地域/品類）</li><li>有效 SKU / 可服務場景數量</li></ul>', link:'供給越豐富、品質越好，用戶體驗和留存就越高，進而拉動更多需求。', pb:'初期重點補足短板品類或核心場景；中期需平衡供需兩端，避免資源錯配。'}), (DB.DRV_USR = {s:'用戶驅動', sum:'圍繞用戶生命週期的「開源節流」，包含拉新、激活、留存、傳播、防流失等。', kpi:'<ul><li>新增用戶數 (New Users)</li><li>用戶留存率 (Retention Rate)</li><li>病毒係數 (K-Factor)</li></ul>', link:'驅動整個 AARRR 模型的運轉，是增長的核心引擎。', pb:'用戶分層運營，針對不同價值和活躍度的用戶，採取差異化策略。'}), (DB.DRV_PRD = {s:'產品驅動', sum:'透過產品自身的體驗、功能和創新，降低使用門檻、提升核心環節轉化率。', kpi:'<ul><li>關鍵任務完成率 (Task Success Rate)</li><li>首次價值體驗時間 (TTFV)</li><li>用戶滿意度 (NPS/CSAT)</li></ul>', link:'主要承接 AARRR 中的「Activation」，並深刻影響「Retention」。', pb:'優化核心流程，減少操作步驟；設計「Aha! Moment」，讓用戶快速感受價值。'}), (DB.DRV_CHN = {s:'渠道驅動', sum:'持續尋找並優化高效率、低成本的流量來源，建立穩定的獲客渠道矩陣。', kpi:'<ul><li>渠道獲客成本 (CAC by Channel)</li><li>廣告投資回報率 (ROAS)</li><li>渠道轉換率 (CVR)</li></ul>', link:'直接對應 AARRR 中的「Acquisition」和資源閉環的「獲客」階段。', pb:'進行渠道組合測試，找到最適合的1-3個核心渠道，並規模化投放。'}), (DB.DRV_EVT = {s:'活動驅動', sum:'在特定時間節點（如節假日、大事件）策劃市場活動，短期內引爆流量與交易高峰。', kpi:'<ul><li>活動期間新增用戶/訂單量</li><li>活動帶來的高峰日/時活 (Peak DAU/HAU)</li></ul>', link:'主要作用於「Acquisition」和「Revenue」，但需有「Retention」策略配合，防止用戶用完即走。', pb:'設計活動前預熱、活動中引爆、活動後留存的全鏈路。'}), (DB.DRV_DAT = {s:'數據驅動', sum:'建立「指標監控-洞察發現-策略假設-實驗驗證-迭代優化」的數據驅動迴圈。', kpi:'<ul><li>核心指標達成率</li><li>AB 實驗成功率與迭代速度</li></ul>', link:'為所有其他驅動方式提供決策依據，發現瓶頸並衡量效果。', pb:'搭建數據看板，規範事件埋點與歸因模型，建立快速實驗的能力。'}), (DB.DRV_BRD = {s:'品牌驅動', sum:'透過長期一致的價值傳遞，建立用戶信任和心智佔有率，從而降低長期獲客和決策成本。', kpi:'<ul><li>品牌淨推薦值 (NPS)</li><li>品牌關鍵字搜尋量</li><li>無提示第一提及率 (Top of Mind)</li></ul>', link:'全面影響轉化率、復購率和推薦率，是增長的放大器。', pb:'持續輸出一致的品牌訊息，積極管理用戶口碑與評價。'}), (DB.AQ = {s:'Acquisition (獲取)', sum:'從各種渠道讓潛在用戶首次接觸、訪問、安裝或註冊產品。', kpi:'<ul><li>曝光量、點擊率 (CTR)</li><li>安裝/註冊轉換率 (CVR)</li></ul>', link:'對應「渠道驅動」，並流入資源閉環的「獲客」階段。', pb:'優化落地頁(Landing Page)，簡化註冊流程，A/B 測試廣告素材。'}), (DB.ACT = {s:'Activation (激活)', sum:'引導新用戶完成能體驗到產品核心價值的關鍵行為，即「Aha! Moment」。', kpi:'<ul><li>新用戶首日/七日活躍率</li><li>關鍵行為完成率（如：發布第一張照片）</li></ul>', link:'對應「產品驅動」，是從「獲客」到「留存」的關鍵橋樑。', pb:'設計新手引導 (Onboarding)，提供首單優惠或任務獎勵。'}), (DB.RTN = {s:'Retention (留存)', sum:'讓用戶在初次體驗後，持續、規律地回來使用產品。', kpi:'<ul><li>次日、7日、30日留存率</li><li>用戶流失率 (Churn Rate)</li></ul>', link:'對應資源閉環的「留存」階段，是商業模式成立的基石。', pb:'建立召回機制（Push/Email），綁定高頻使用場景，推出會員體系。'}), (DB.REV = {s:'Revenue (變現)', sum:'將用戶的活躍行為，透過各種方式轉化為實際收入。', kpi:'<ul><li>付費轉化率</li><li>每用戶平均收入 (ARPU)</li><li>付費用戶平均收入 (ARPPU)</li></ul>', link:'對應資源閉環的「變現」階段，驗證商業價值。', pb:'提升客單價 (M) 和購買頻次 (F)，探索訂閱、增值服務等模式。'}), (DB.REF = {s:'Referral (推薦)', sum:'激勵滿意用戶自發地將產品推薦給他人，形成病毒式傳播。', kpi:'<ul><li>病毒係數 K-Factor = (每用戶發出邀請數) * (邀請轉化率)</li></ul>', link:'是成本最低的獲客方式，直接反哺「Acquisition」階段，形成增長飛輪。', pb:'設計雙向獎勵機制，簡化分享流程，提供易於傳播的內容。'}), (DB.NSM = {s:'北極星指標', sum:'是全公司、全團隊在特定階段內，共同追求的唯一核心指標，代表了產品為用戶創造的核心價值。', kpi:'<ul><li>平台型：月/週活交易用戶數、總交易額 (GMV)</li><li>內容型：核心用戶的總閱讀/觀看時長</li></ul>', link:'串聯獲客(A)、留存(B)、變現(C)三個階段，確保所有增長活動都朝同一個方向努力。', pb:'每季或每半年重新校準北極星指標，確保其仍反映當前階段的核心用戶價值。'}), (DB.CAC = {s:'CAC & Payback', sum:'獲客成本(CAC)指獲取單一新用戶所需的總花費。回本週期(Payback Period)指需要多久才能從該用戶身上賺回獲客成本。', kpi:'<ul><li>CAC = 總市場與銷售費用 / 新增用戶數</li><li>Payback (月) = CAC / (ARPU × 毛利率)</li></ul>', link:'CAC 是「獲客」階段的直接產出，Payback 則關聯「再投資」決策。', pb:'分渠道計算 CAC，並設定上限；努力縮短回本週期，提升資金效率。'}), (DB.RFM = {s:'RFM 用戶分層', sum:'一種經典的用戶價值分析模型，根據用戶最近一次消費(Recency)、消費頻率(Frequency)、消費金額(Monetary)三個維度進行分群。', kpi:'<ul><li>將用戶分為：重要價值、重要保持、重要發展、一般挽留等8個群體。</li></ul>', link:'主要應用於「留存」階段，是實現精細化運營的基礎。', pb:'對不同分層的用戶，推送不同的訊息、活動和客戶關懷策略。'}), (DB.ARPU = {s:'ARPU', sum:'(Average Revenue Per User) 在特定時間內，從每個活躍用戶身上平均獲得的收入。', kpi:'<ul><li>ARPU = 總收入 / 總活躍用戶數</li></ul>', link:'「變現」階段的核心衡量標準。', pb:'透過提高客單價(M)或提升購買頻次(F)來拉動 ARPU。'}), (DB.LTV = {s:'LTV', sum:'(Lifetime Value) 用戶終身價值，指預期從單一用戶在整個生命週期內獲得的總利潤。', kpi:'<ul><li>LTV ≈ ARPU × (1 / 流失率) × 毛利率</li></ul>', link:'是「再投資」階段的關鍵決策依據。健康的業務要求 LTV > CAC。', pb:'提升留存率是提高 LTV 最有效的方法。'}), (DB.A = {s:'🎯 獲客 (Acquire)', sum:'投入資源（人力、資金）獲取新用戶。', link:'由上層「增長驅動」和「AARRR」模型指導，向下驅動具體的「獲客策略」。', pb:''}), (DB.B = {s:'🤝 留存 (Retain)', sum:'透過優質的產品和運營，讓用戶留下來並持續活躍。', link:'承接「獲客」成果，是商業模式的基礎，支撐後續的「變現」。', pb:''}), (DB.C = {s:'💰 變現 (Monetize)', sum:'將活躍用戶轉化為收入，驗證商業模式。', link:'基於穩定的「留存」，將用戶價值轉化為商業價值。', pb:''}), (DB.D = {s:'🚀 再投資 (Re-invest)', sum:'將獲得的利潤，以 LTV/CAC 為標尺，重新投入到獲客渠道中，形成規模化的增長循環。', link:'閉環的終點，也是下一輪增長的起點，驅動飛輪加速。', pb:''}), (DB.A1 = {s:'廣告投放', sum:'在各大流量平台（如 Google, Meta）購買廣告，精準觸達目標用戶。<br><br><b>[適用對象] C 端</b>', pb:'A/B 測試廣告素材、受眾和落地頁，持續優化 ROAS。'}), (DB.A2 = {s:'補貼激勵', sum:'透過首單立減、註冊紅包等方式，用金錢換取用戶的快速行動。<br><br><b>[適用對象] C 端</b>', pb:'設定明確的止損線，並配合風控系統，防止被「羊毛黨」濫用。'}), (DB.A3 = {s:'異業合作', sum:'與業務互補、用戶群相似的品牌合作，進行流量互換或聯合活動。<br><br><b>[適用對象] B 端、C 端</b>', pb:'優先選擇能以 CPA/CPS (按效果付費) 方式合作的夥伴，降低風險。'}), (DB.BX1 = {s:'展會/BD拓客', sum:'針對 B 端客戶，透過參加行業展會、線下拜訪等方式，精準獲取高價值客戶名單。<br><br><b>[適用對象] B 端</b>', pb:'準備好標準化的產品介紹和成功案例，提高現場轉化效率。'}), (DB.B1 = {s:'新手引導', sum:'在用戶首次使用時，提供清晰、分步的引導，幫助其快速上手並完成關鍵操作。<br><br><b>[適用對象] B 端、C 端</b>', pb:'設計「Aha! Moment」導向的引導流程，而非一次性呈現所有功能。'}), (DB.B2 = {s:'場景綁定', sum:'將產品功能與用戶的高頻、剛需生活/工作場景深度綁定，提升使用慣性。<br><br><b>[適用對象] C 端</b>', pb:'優先接入支付、通訊、交通等場景，讓用戶「不得不用」。'}), (DB.C1 = {s:'提高客單價(M)', sum:'透過商品組合、加價購、滿額贈等方式，提升用戶單次交易的金額。<br><br><b>[適用對象] C 端</b>', pb:'在支付前環節，基於用戶畫像進行個性化推薦。'}), (DB.C2 = {s:'提高頻次(F)', sum:'透過訂閱制、會員積分、定期提醒等方式，提升用戶在統計週期內的購買次數。<br><br><b>[適用對象] C 端</b>', pb:'簡化支付和複購流程，提供「一鍵下單」等便捷功能。'}), (DB.C3 = {s:'交叉銷售/金融', sum:'向現有用戶推薦相關但不同的產品或服務，或提供消費信貸、分期等金融工具。<br><br><b>[適用對象] B 端、C 端</b>', pb:'必須基於用戶數據和風控模型，避免不相關的打擾和壞帳風險。'}), (DB.D1 = {s:'LTV/CAC分析', sum:'定期計算並監控 LTV/CAC 的比率，作為判斷業務健康度和擴張潛力的核心指標。<br><br><b>[適用對象] B 端、C 端</b>', pb:'一般認為 LTV/CAC > 3 是健康且可擴張的信號。'}), (DB.D2 = {s:'優化ROI渠道', sum:'將預算動態地從投資回報率(ROI)低的渠道，轉移到 ROI 高的渠道。<br><br><b>[適用對象] B 端、C 端</b>', pb:'藉助多觸點歸因(MTA)和營銷組合模型(MMM)等工具進行科學歸因。'}), (DB.S1 = {s:'01 吸引', sum:'以低價或高價值的服務作為入口，吸引大量初始用戶。', pb:'例如：首單1元、免費試用、提供有用的工具或內容。'}), (DB.S2 = {s:'02 高潛力', sum:'從初始用戶中，識別並篩選出真正對核心服務有需求的高潛力目標用戶。', pb:'分析早期用戶行為數據，找到與長期留存和高消費相關的特徵。'}), (DB.S3 = {s:'03 擴場景', sum:'基於高潛力用戶的需求，擴展產品功能或服務場景，增加用戶黏性。', pb:'例如，打車軟體增加送餐服務，支付工具增加生活繳費功能。'}), (DB.S4 = {s:'04 提升體驗', sum:'持續打磨產品，優化核心流程體驗，並建立會員、積分等回饋體系。', pb:'減少操作步驟、提升響應速度、給予即時的正面反饋。'}), (DB.S5 = {s:'05 回流推薦', sum:'滿意的活躍用戶會持續回訪，並透過口碑向外推薦，帶來新用戶。', pb:'設計合理的分享獎勵機制，讓推薦行為對新老用戶都有利。'}), (DB.S6 = {s:'06 規模擴大', sum:'用戶和交易規模的擴大，帶來了更多數據，可以進行更精準的行銷和推薦。', pb:'建立數據標籤體系和用戶畫像，提升交叉銷售的成功率。'}), (DB.S7 = {s:'07 成本↓價值↑', sum:'口碑推薦降低了平均獲客成本(CAC)，精準行銷提升了每用戶價值(ARPU/LTV)，增強了盈利能力，可以將更多利潤投入到第一步，吸引更多用戶，飛輪加速。', pb:''}), (DB.CS_HUB = {s:'產品冷啟動', sum:'指產品在幾乎沒有用戶和市場認知的情況下，如何獲取第一批核心用戶，並完成初步驗證的過程。', link:'是從0到1的關鍵階段，決定了產品能否順利進入後續的成長軌道。'}), (DB.CS1 = {s:'名人效應', sum:'利用影響力人物（KOL、行業專家）的信譽和自有流量，為產品進行背書，快速建立市場信任度和初始用戶群。', pb:'合作前要評估 KOL 的粉絲畫像與產品目標用戶是否匹配。'}), (DB.CS2 = {s:'爆款產品', sum:'集中資源打造一個用戶需求極強、能引發話題的「爆款」或「殺手級」功能，以此帶動整個產品的關注度。', pb:'例如：AI 繪圖功能、趣味心理測試、行業獨家數據報告。'}), (DB.CS3 = {s:'馬甲效應', sum:'用不同的產品名稱或定位（馬甲）在多個渠道進行推廣，測試不同市場的反應，或營造「很多人都在用」的氛圍。', pb:'注意保持核心體驗一致，避免品牌混亂。常用於遊戲或社交產品。'}), (DB.CS4 = {s:'種子特權', sum:'邀請一小批高品質的種子用戶進行內測，給予他們特殊身份或權益，讓他們有參與感和歸屬感，並藉此打磨產品。', pb:'建立高效的用戶反饋渠道（如：專屬社群），並對有效反饋給予獎勵。'}), (DB.CS5 = {s:'定向邀請', sum:'不追求廣撒網，而是精準地向最有可能成為核心用戶的小圈子發出邀請，確保早期用戶的高品質。', pb:'例如：設計師社群、特定技術論壇的成員。品質比數量更重要。'}), (DB.CS6 = {s:'媒體報導', sum:'主動與科技媒體、行業垂直媒體或社群大號合作，透過新聞稿、深度評測等方式，製造話題，獲得集中曝光。', pb:'準備好有新聞點的「媒體資料包」(Media Kit)，方便記者報導。'});
+
+  /* ===================== 繪圖引擎 Start ===================== */
+  let VIEW='overview';
+  const NODE_REG={};
+
+  function clearSVG(){ gLanes.innerHTML=''; gLinks.innerHTML=''; gNodes.innerHTML=''; gGroupTitles.innerHTML='' }
+
+  function renderLanes(lanes){
+    lanes?.forEach(l=>{
+      const grp = document.createElementNS('http://www.w3.org/2000/svg','g');
+      const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      r.setAttribute('x', l.x); r.setAttribute('y', l.y); r.setAttribute('width', l.w); r.setAttribute('height', l.h); r.setAttribute('class','lane-rect');
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', l.x+4); t.setAttribute('y', l.y-8); t.setAttribute('class','lane-title'); t.textContent=l.title;
+      grp.appendChild(r); grp.appendChild(t); gLanes.appendChild(grp);
+    });
+  }
+  function renderGroupTitles(titles){
+    titles?.forEach(t=>{
+      const te = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      te.setAttribute('x', t.x); te.setAttribute('y', t.y); te.setAttribute('class', 'group-title'); te.textContent = t.text;
+      gGroupTitles.appendChild(te);
+    });
+  }
+
+  function addNode(n){
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', `node ${n.type}`);
+    g.dataset.id = n.id;
+    g.setAttribute('tabindex', '0');
+    
+    const isMetric = n.type === 'metric';
+    const w = n.w || (isMetric ? 190 : 220);
+    const h = n.h || (isMetric ? 54 : 56);
+    
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', n.x - w / 2); rect.setAttribute('y', n.y - h / 2);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    g.appendChild(rect);
+
+    const titleLines = n.title.split('\n');
+    const hasSub = !!n.sub;
+    const lineHeight = 16;
+    const numLines = titleLines.length + (hasSub ? 1 : 0);
+    const totalTextHeight = numLines * lineHeight - (hasSub ? 2 : 0);
+    let currentY = n.y - (totalTextHeight / 2) + (lineHeight / 2);
+
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    title.setAttribute('x', n.x);
+    title.setAttribute('text-anchor', 'middle');
+    titleLines.forEach((line) => {
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+        tspan.setAttribute('x', n.x);
+        tspan.setAttribute('y', currentY);
+        tspan.textContent = line;
+        title.appendChild(tspan);
+        currentY += lineHeight;
+    });
+    g.appendChild(title);
+
+    if (hasSub) {
+        const sub = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        sub.setAttribute('x', n.x);
+        sub.setAttribute('y', currentY);
+        sub.setAttribute('text-anchor', 'middle');
+        sub.setAttribute('class', 'sub');
+        sub.textContent = n.sub;
+        g.appendChild(sub);
+    }
+
+    if (n['data-bc']) g.dataset.bc = n['data-bc'].toUpperCase();
+    gNodes.appendChild(g);
+    NODE_REG[n.id] = { ...n, w, h };
+  }
+
+  function addLink(a,b,cls=''){
+    const pa=NODE_REG[a], pb=NODE_REG[b]; if(!pa||!pb) return;
+    const p1={x:pa.x,y:pa.y}, p2={x:pb.x,y:pb.y};
+    const dx=(p2.x-p1.x)*0.5;
+    const d=`M ${p1.x} ${p1.y} C ${p1.x+dx} ${p1.y}, ${p2.x-dx} ${p2.y}, ${p2.x} ${p2.y}`;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class',`link ${cls}`); g.dataset.from=a; g.dataset.to=b;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', d); p.setAttribute('marker-end','url(#arrow)');
+    g.appendChild(p); gLinks.appendChild(g);
+  }
+
+  function render(view){
+    clearSVG(); Object.keys(NODE_REG).forEach(k=>delete NODE_REG[k]);
+    const data = view === 'overview' ? OVERVIEW : (view === 'fly7' ? FLY7 : COLD);
+    if(data.lanes) renderLanes(data.lanes);
+    renderGroupTitles(data.groupTitles);
+    data.nodes.forEach(addNode);
+    data.links.forEach(([a,b,c])=>addLink(a,b,c||''));
+    updateToolbarState(view);
+    applyToggles();
+  }
+  /* ===================== 繪圖引擎 End ===================== */
+
+  /* ===================== 互動邏輯 Start ===================== */
+  const tglDrivers=$('#tglDrivers'), tglAARRR=$('#tglAARRR'), tglMetrics=$('#tglMetrics'), tglLoop=$('#tglLoop'), tglStrategy=$('#tglStrategy');
+
+  function applyToggles(){
+    const isOverview = VIEW === 'overview';
+    if (!isOverview) {
+      $$('#nodes .node').forEach(el => el.classList.remove('filtered-out'));
+      $$('#links .link').forEach(el => el.classList.remove('filtered-out'));
+      return;
+    }
+    
+    const layerVisibility = {
+        L0: tglDrivers.checked,
+        L1: tglAARRR.checked,
+        L2: tglMetrics.checked,
+        L3: tglLoop.checked,
+        L4: tglStrategy.checked,
+    };
+
+    $$('#nodes .node').forEach(el => {
+        const n = NODE_REG[el.dataset.id];
+        if (!n || !n.lane) return;
+        const isVisible = layerVisibility[n.lane];
+        el.classList.toggle('filtered-out', !isVisible);
+    });
+    
+    gGroupTitles.style.opacity = tglStrategy.checked ? 1 : 0;
+    refreshLinkVisibility();
+  }
+
+  function refreshLinkVisibility(){
+    $$('#links .link').forEach(l=>{
+      const fromNode = $(`#nodes .node[data-id='${l.dataset.from}']`);
+      const toNode = $(`#nodes .node[data-id='${l.dataset.to}']`);
+      const isFiltered = fromNode?.classList.contains('filtered-out') || toNode?.classList.contains('filtered-out');
+      l.classList.toggle('filtered-out', isFiltered);
+    });
+  }
+  
+  function highlight(ids){
+    $$('#nodes .node').forEach(n=>n.classList.remove('emph'));
+    $$('#links .link').forEach(l=>l.classList.remove('emph-link'));
+    ids.forEach(id=>{ const nd=$(`#nodes .node[data-id='${id}']`); if(nd) nd.classList.add('emph') });
+    $$('#links .link').forEach(l=>{
+        if (ids.includes(l.dataset.from) && ids.includes(l.dataset.to)) {
+            l.classList.add('emph-link');
+        }
+    });
+  }
+  
+  function selectNode(id){
+    if(!id) return;
+    const m = DB[id] || {};
+    
+    // 填充內容
+    $('#ov-title').textContent = m.s || id;
+    $('#ov-summary').innerHTML = m.sum || '暫無說明';
+    $('#ov-kpi').innerHTML = m.kpi || '';
+    $('#ov-rel').textContent = m.link || '';
+    $('#ov-pb').textContent = m.pb || '';
+    
+    // 根據內容決定是否顯示區塊
+    $('#block-sum').style.display = 'block'; // Summary 區塊總是顯示
+    $('#block-kpi').style.display = m.kpi ? 'block' : 'none';
+    $('#block-rel').style.display = m.link ? 'block' : 'none';
+    $('#block-pb').style.display = m.pb ? 'block' : 'none';
+
+    const related = [id];
+    $$('#links .link').forEach(l => {
+        const f = l.dataset.from, t = l.dataset.to;
+        if (f === id) related.push(t);
+        if (t === id) related.push(f);
+    });
+    highlight([...new Set(related)]);
+  }
+  
+  function showTip(nodeEl,e){
+    if(!nodeEl) return;
+    const id = nodeEl.dataset.id;
+    const m = DB[id] || {};
+    tip.innerHTML = `<b>${m.s || id}</b><br><span class="muted">${m.sum || ''}</span>`;
+    const tr = tip.getBoundingClientRect();
+    let left = e.clientX + 12, top = e.clientY + 12;
+    if (left + tr.width > window.innerWidth) left = e.clientX - tr.width - 12;
+    if (top + tr.height > window.innerHeight) top = e.clientY - tr.height - 12;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+    tip.style.opacity = 1;
+  }
+  
+  function hideTip(){ tip.style.opacity=0 }
+
+  gNodes.addEventListener('click', e => { const node = e.target.closest('.node'); if (node && !node.classList.contains('filtered-out')) selectNode(node.dataset.id) });
+  gNodes.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') { const node = e.target.closest('.node'); if (node && !node.classList.contains('filtered-out')) selectNode(node.dataset.id) }});
+  gNodes.addEventListener('mousemove', e => { const node = e.target.closest('.node'); if (node && !node.classList.contains('filtered-out')) showTip(node,e) });
+  gNodes.addEventListener('mouseleave', hideTip);
+
+  function updateToolbarState(currentView) {
+      const isOverview = currentView === 'overview';
+      [tglDrivers, tglAARRR, tglMetrics, tglLoop, tglStrategy].forEach(tgl => tgl.disabled = !isOverview);
+  }
+
+  $$('input[name="view"]').forEach(r => r.addEventListener('change', e => {
+      VIEW = e.target.value;
+      render(VIEW);
+  }));
+  
+  [tglDrivers, tglAARRR, tglMetrics, tglLoop, tglStrategy].forEach(tgl => tgl.addEventListener('change', applyToggles));
+
+  function resetAll(){
+    highlight([]);
+    $('#ov-title').textContent = '增長模型互動圖譜';
+    $('#ov-summary').innerHTML = '點擊左側任一圖塊，或使用上方工具列切換視圖與篩選，來探索增長模型。';
+    
+    // 隱藏除 Summary 外的所有區塊
+    $('#block-sum').style.display = 'block';
+    $('#block-kpi').style.display = 'none';
+    $('#block-rel').style.display = 'none';
+    $('#block-pb').style.display = 'none';
+
+    hideTip();
+    
+    $$('input[name="view"]').forEach(r=>{ if(r.value==='overview') r.checked=true });
+    VIEW='overview';
+    [tglDrivers, tglAARRR, tglMetrics, tglLoop, tglStrategy].forEach(tgl => tgl.checked = true);
+    
+    render(VIEW);
+    selectNode('A');
+  }
+  $('#btnReset').addEventListener('click',resetAll);
+
+  // --- 初始渲染 ---
+  render(VIEW);
+  selectNode('A');
+  /* ===================== 互動邏輯 End ===================== */
+})();
+</script>
+</body>
+</html>
